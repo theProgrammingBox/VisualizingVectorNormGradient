@@ -86,7 +86,7 @@ namespace GLOBAL
 	Random random(Random::MakeSeed(0));
 	constexpr float ONEF = 1.0f;
 	constexpr float ZEROF = 0.0f;
-	constexpr float LEARNING_RATE = 0.1f;
+	constexpr float LEARNING_RATE = 0.01f;
 }
 
 void cpuGenerateUniform(float* matrix, uint32_t size, float min = 0, float max = 1)
@@ -129,18 +129,9 @@ void cpuSaxpy(int N, const float* alpha, const float* X, int incX, float* Y, int
 
 float fastInvSqrt(float number)
 {
-	long i;
-	float x2, y;
-	const float threehalfs = 1.5F;
-
-	x2 = number * 0.5F;
-	y = number;
-	i = *(long*)&y;
-	i = 0x5f3759df - (i >> 1);
-	y = *(float*)&i;
-	y = y * (threehalfs - (x2 * y * y));
-
-	return y;
+	long i = 0x5F1FFFF9 - (*(long*)&number >> 1);
+	float tmp = *(float*)&i;
+	return tmp * 0.703952253f * (2.38924456f - number * tmp * tmp);
 }
 
 class Visualizer : public olc::PixelGameEngine
@@ -157,7 +148,7 @@ public:
 public:
 	bool OnUserCreate() override
 	{
-		cpuGenerateUniform(vec, 2, -100, 100);
+		cpuGenerateUniform(vec, 2, -1, 1);
 
 		orgin[0] = ScreenWidth() * 0.5f;
 		orgin[1] = ScreenHeight() * 0.5f;
@@ -183,7 +174,7 @@ public:
 		dx[0] = vec[0] * invMag;
 		dx[1] = vec[1] * invMag;
 
-		DrawLine(orgin[0], orgin[1], orgin[0] + vec[0], orgin[1] + vec[1], olc::RED);
+		DrawLine(orgin[0], orgin[1], orgin[0] + vec[0] * 100, orgin[1] + vec[1] * 100, olc::RED);
 		DrawLine(orgin[0], orgin[1], orgin[0] + mouseVec[0] * 100, orgin[1] + mouseVec[1] * 100, olc::GREEN);
 		DrawLine(orgin[0], orgin[1], orgin[0] + dx[0] * 100, orgin[1] + dx[1] * 100, olc::BLUE);
 
@@ -212,9 +203,7 @@ public:
 			&GLOBAL::ZEROF,
 			grad, 2, 0,
 			1);
-
-		//DrawString(0, 0, "Gradient: " + std::to_string(grad[0]) + ", " + std::to_string(grad[1]));
-
+		
 		float vecGrad[2];
 		float total = vec[0] * vec[0] + vec[1] * vec[1];
 		vecGrad[0] = ((grad[0] * vec[1] * vec[1]) - (grad[1] * vec[0] * vec[1])) / std::pow(total, 1.5f);
