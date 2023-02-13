@@ -134,22 +134,6 @@ float invSqrt(float number)
 	return tmp * 0.703952253f * (2.38924456f - number * tmp * tmp);
 }
 
-float invSqrt2(float number)
-{
-	long i;
-	float x2, y;
-	const float threehalfs = 1.5F;
-
-	x2 = number * 0.5F;
-	y = number;
-	i = *(long*)&y;
-	i = 0x5f3759df - (i >> 1);
-	y = *(float*)&i;
-	y = y * (threehalfs - (x2 * y * y));
-
-	return y;
-}
-
 class Visualizer : public olc::PixelGameEngine
 {
 public:
@@ -186,13 +170,13 @@ public:
 
 		// normalize vector
 		invMag = invSqrt(vec[0] * vec[0] + vec[1] * vec[1]);
-		float dx[2];
-		dx[0] = vec[0] * invMag;
-		dx[1] = vec[1] * invMag;
+		float normVec[2];
+		normVec[0] = vec[0] * invMag;
+		normVec[1] = vec[1] * invMag;
 
-		DrawLine(orgin[0], orgin[1], orgin[0] + vec[0] * 100, orgin[1] + vec[1] * 100, olc::RED);
-		DrawLine(orgin[0], orgin[1], orgin[0] + mouseVec[0] * 100, orgin[1] + mouseVec[1] * 100, olc::GREEN);
-		DrawLine(orgin[0], orgin[1], orgin[0] + dx[0] * 100, orgin[1] + dx[1] * 100, olc::BLUE);
+		DrawLine(orgin[0], orgin[1], orgin[0] + vec[0] * 10, orgin[1] + vec[1] * 10, olc::RED);
+		DrawLine(orgin[0], orgin[1], orgin[0] + mouseVec[0] * 10, orgin[1] + mouseVec[1] * 10, olc::GREEN);
+		DrawLine(orgin[0], orgin[1], orgin[0] + normVec[0] * 10, orgin[1] + normVec[1] * 10);
 
 		// calculate dot product
 		float dot[1];
@@ -201,7 +185,7 @@ public:
 			1, 1, 2,
 			&GLOBAL::ONEF,
 			mouseVec, 1, 0,
-			dx, 2, 0,
+			normVec, 2, 0,
 			&GLOBAL::ZEROF,
 			dot, 1, 0,
 			1);
@@ -232,51 +216,10 @@ public:
 	}
 };
 
-void ComparePerf(float min = 0.0f, float max = 1.0f, int count = 1000000)
-{
-	auto start = std::chrono::high_resolution_clock::now();
-	float avgError = 0;
-	for (int i = count; i--;)
-	{
-		float num = GLOBAL::random.Rfloat(min, max);
-		avgError += std::abs(invSqrt(num) - 1.0f / std::sqrt(num));
-	}
-	auto end = std::chrono::high_resolution_clock::now();
-	auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
-	printf("Time taken: %lld microseconds\n", duration.count());
-	printf("Average Error: %f\n", avgError / count);
-}
-
-void ComparePerf2(float min = 0.0f, float max = 1.0f, int count = 1000000)
-{
-	auto start = std::chrono::high_resolution_clock::now();
-	float avgError = 0;
-	for (int i = count; i--;)
-	{
-		float num = GLOBAL::random.Rfloat(min, max);
-		avgError += std::abs(invSqrt2(num) - 1.0f / std::sqrt(num));
-	}
-	auto end = std::chrono::high_resolution_clock::now();
-	auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
-	printf("Time taken: %lld microseconds\n", duration.count());
-	printf("Average Error: %f\n", avgError / count);
-}
-
 int main()
 {
-	ComparePerf2(0.0f, 1.0f);
-	ComparePerf2(0.0f, 10.0f);
-	ComparePerf2(0.0f, 100.0f);
-	ComparePerf2(0.0f, 1000.0f);
-	printf("\n");
-	
-	ComparePerf(0.0f, 1.0f);
-	ComparePerf(0.0f, 10.0f);
-	ComparePerf(0.0f, 100.0f);
-	ComparePerf(0.0f, 1000.0f);
-
-	/*Visualizer visualizer;
+	Visualizer visualizer;
 	if (visualizer.Construct(960, 540, 1, 1))
-		visualizer.Start();*/
+		visualizer.Start();
 	return 0;
 }
