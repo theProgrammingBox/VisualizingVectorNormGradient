@@ -127,11 +127,27 @@ void cpuSaxpy(int N, const float* alpha, const float* X, int incX, float* Y, int
 		Y[i * incY] += *alpha * X[i * incX];
 }
 
-float fastInvSqrt(float number)
+float invSqrt(float number)
 {
 	long i = 0x5F1FFFF9 - (*(long*)&number >> 1);
 	float tmp = *(float*)&i;
 	return tmp * 0.703952253f * (2.38924456f - number * tmp * tmp);
+}
+
+float invSqrt2(float number)
+{
+	long i;
+	float x2, y;
+	const float threehalfs = 1.5F;
+
+	x2 = number * 0.5F;
+	y = number;
+	i = *(long*)&y;
+	i = 0x5f3759df - (i >> 1);
+	y = *(float*)&i;
+	y = y * (threehalfs - (x2 * y * y));
+
+	return y;
 }
 
 class Visualizer : public olc::PixelGameEngine
@@ -164,12 +180,12 @@ public:
 		float mouseVec[2];
 		mouseVec[0] = GetMouseX() - orgin[0];
 		mouseVec[1] = GetMouseY() - orgin[1];
-		float invMag = fastInvSqrt(mouseVec[0] * mouseVec[0] + mouseVec[1] * mouseVec[1]);
+		float invMag = invSqrt(mouseVec[0] * mouseVec[0] + mouseVec[1] * mouseVec[1]);
 		mouseVec[0] *= invMag;
 		mouseVec[1] *= invMag;
 
 		// normalize vector
-		invMag = fastInvSqrt(vec[0] * vec[0] + vec[1] * vec[1]);
+		invMag = invSqrt(vec[0] * vec[0] + vec[1] * vec[1]);
 		float dx[2];
 		dx[0] = vec[0] * invMag;
 		dx[1] = vec[1] * invMag;
@@ -216,10 +232,51 @@ public:
 	}
 };
 
+void ComparePerf(float min = 0.0f, float max = 1.0f, int count = 1000000)
+{
+	auto start = std::chrono::high_resolution_clock::now();
+	float avgError = 0;
+	for (int i = count; i--;)
+	{
+		float num = GLOBAL::random.Rfloat(min, max);
+		avgError += std::abs(invSqrt(num) - 1.0f / std::sqrt(num));
+	}
+	auto end = std::chrono::high_resolution_clock::now();
+	auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
+	printf("Time taken: %lld microseconds\n", duration.count());
+	printf("Average Error: %f\n", avgError / count);
+}
+
+void ComparePerf2(float min = 0.0f, float max = 1.0f, int count = 1000000)
+{
+	auto start = std::chrono::high_resolution_clock::now();
+	float avgError = 0;
+	for (int i = count; i--;)
+	{
+		float num = GLOBAL::random.Rfloat(min, max);
+		avgError += std::abs(invSqrt2(num) - 1.0f / std::sqrt(num));
+	}
+	auto end = std::chrono::high_resolution_clock::now();
+	auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
+	printf("Time taken: %lld microseconds\n", duration.count());
+	printf("Average Error: %f\n", avgError / count);
+}
+
 int main()
 {
-	Visualizer visualizer;
+	ComparePerf2(0.0f, 1.0f);
+	ComparePerf2(0.0f, 10.0f);
+	ComparePerf2(0.0f, 100.0f);
+	ComparePerf2(0.0f, 1000.0f);
+	printf("\n");
+	
+	ComparePerf(0.0f, 1.0f);
+	ComparePerf(0.0f, 10.0f);
+	ComparePerf(0.0f, 100.0f);
+	ComparePerf(0.0f, 1000.0f);
+
+	/*Visualizer visualizer;
 	if (visualizer.Construct(960, 540, 1, 1))
-		visualizer.Start();
+		visualizer.Start();*/
 	return 0;
 }
