@@ -134,6 +134,60 @@ float invSqrt(float number)
 	return tmp * 0.703952253f * (2.38924456f - number * tmp * tmp);
 }
 
+float cpuNormDot(uint32_t size, float* vec1, float* vec2, float* vec1Gradient, float* vec2Gradient) {
+	float sum1[1];
+	float sum2[1];
+	float dot[1];
+	float denominator;
+
+	/*for (uint32_t i = size; i--;)
+	{
+		*sum1 += vec1[i] * vec1[i];
+		*sum2 += vec2[i] * vec2[i];
+		*dot += vec1[i] * vec2[i];
+	}*/
+
+	cpuSgemmStridedBatched(
+		false, false,
+		1, 1, size,
+		&GLOBAL::ONEF,
+		vec1, 1, 0,
+		vec1, size, 0,
+		&GLOBAL::ZEROF,
+		sum1, 1, 0,
+		1);
+
+	cpuSgemmStridedBatched(
+		false, false,
+		1, 1, size,
+		&GLOBAL::ONEF,
+		vec2, 1, 0,
+		vec2, size, 0,
+		&GLOBAL::ZEROF,
+		sum2, 1, 0,
+		1);
+
+	cpuSgemmStridedBatched(
+		false, false,
+		1, 1, size,
+		&GLOBAL::ONEF,
+		vec1, 1, 0,
+		vec2, size, 0,
+		&GLOBAL::ZEROF,
+		dot, 1, 0,
+		1);
+
+	denominator = invSqrt(*sum1 * *sum2 * *sum1 * *sum1);
+	for (uint32_t j = size; j--;)
+		vec1Gradient[j] = (vec2[j] * (*sum1 - vec1[j] * vec1[j]) + vec1[j] * (vec1[j] * vec2[j] - *dot)) * denominator;
+
+	denominator = invSqrt(*sum1 * *sum2 * *sum2 * *sum2);
+	for (uint32_t j = size; j--;)
+		vec2Gradient[j] = (vec1[j] * (*sum2 - vec2[j] * vec2[j]) + vec2[j] * (vec2[j] * vec1[j] - *dot)) * denominator;
+
+	return *dot * invSqrt(*sum1 * *sum2);
+}
+
 class Visualizer : public olc::PixelGameEngine
 {
 public:
@@ -164,53 +218,16 @@ public:
 		float mouseVec[2];
 		mouseVec[0] = GetMouseX() - orgin[0];
 		mouseVec[1] = GetMouseY() - orgin[1];
-		float invMag = invSqrt(mouseVec[0] * mouseVec[0] + mouseVec[1] * mouseVec[1]);
-		mouseVec[0] *= invMag;
-		mouseVec[1] *= invMag;
 
-		// normalize vector
-		invMag = invSqrt(vec[0] * vec[0] + vec[1] * vec[1]);
-		float normVec[2];
-		normVec[0] = vec[0] * invMag;
-		normVec[1] = vec[1] * invMag;
-
-		DrawLine(orgin[0], orgin[1], orgin[0] + vec[0] * 10, orgin[1] + vec[1] * 10, olc::RED);
-		DrawLine(orgin[0], orgin[1], orgin[0] + mouseVec[0] * 10, orgin[1] + mouseVec[1] * 10, olc::GREEN);
-		DrawLine(orgin[0], orgin[1], orgin[0] + normVec[0] * 10, orgin[1] + normVec[1] * 10);
-
-		// calculate dot product
-		float dot[1];
-		cpuSgemmStridedBatched(
-			false, false,
-			1, 1, 2,
-			&GLOBAL::ONEF,
-			mouseVec, 1, 0,
-			normVec, 2, 0,
-			&GLOBAL::ZEROF,
-			dot, 1, 0,
-			1);
-
+		DrawLine(orgin[0], orgin[1], orgin[0] + vec[0] * 100, orgin[1] + vec[1] * 100, olc::RED);
+		DrawLine(orgin[0], orgin[1], orgin[0] + mouseVec[0], orgin[1] + mouseVec[1], olc::GREEN);
+		
 		// calculate gradient
-		float err[1];
-		err[0] = 1.0f;
-		float grad[2];
-		cpuSgemmStridedBatched(
-			true, false,
-			2, 1, 1,
-			&GLOBAL::ONEF,
-			mouseVec, 1, 0,
-			err, 1, 0,
-			&GLOBAL::ZEROF,
-			grad, 2, 0,
-			1);
-		
+		float mouseGrad[2];
 		float vecGrad[2];
-		float total = vec[0] * vec[0] + vec[1] * vec[1];
-		vecGrad[0] = ((grad[0] * vec[1] * vec[1]) - (grad[1] * vec[0] * vec[1])) / std::pow(total, 1.5f);
-		vecGrad[0] = ((grad[1] * vec[0] * vec[0]) - (grad[0] * vec[1] * vec[0])) / std::pow(total, 1.5f);
+		cpuNormDot(2, vec, mouseVec, vecGrad, mouseGrad);
 		
-		// apply gradient
-		cpuSaxpy(2, &GLOBAL::LEARNING_RATE, grad, 1, vec, 1);
+		cpuSaxpy(2, &GLOBAL::LEARNING_RATE, vecGrad, 1, vec, 1);
 
 		return true;
 	}
