@@ -138,14 +138,6 @@ float cpuNormDot(uint32_t size, float* vec1, float* vec2, float* vec1Gradient, f
 	float sum1[1];
 	float sum2[1];
 	float dot[1];
-	float denominator;
-
-	/*for (uint32_t i = size; i--;)
-	{
-		*sum1 += vec1[i] * vec1[i];
-		*sum2 += vec2[i] * vec2[i];
-		*dot += vec1[i] * vec2[i];
-	}*/
 
 	cpuSgemmStridedBatched(
 		false, false,
@@ -176,22 +168,23 @@ float cpuNormDot(uint32_t size, float* vec1, float* vec2, float* vec1Gradient, f
 		&GLOBAL::ZEROF,
 		dot, 1, 0,
 		1);
-
-	denominator = invSqrt(*sum1 * *sum2 * *sum1 * *sum1);
+	
+	float denominator = invSqrt(*sum1 * *sum2);
+	
 	for (uint32_t j = size; j--;)
 		vec1Gradient[j] = (vec2[j] * (*sum1 - vec1[j] * vec1[j]) + vec1[j] * (vec1[j] * vec2[j] - *dot)) * denominator;
-
-	denominator = invSqrt(*sum1 * *sum2 * *sum2 * *sum2);
+	
 	for (uint32_t j = size; j--;)
 		vec2Gradient[j] = (vec1[j] * (*sum2 - vec2[j] * vec2[j]) + vec2[j] * (vec2[j] * vec1[j] - *dot)) * denominator;
 
-	return *dot * invSqrt(*sum1 * *sum2);
+	return *dot * denominator;
 }
 
 class Visualizer : public olc::PixelGameEngine
 {
 public:
 	float vec[2];
+	float mouseVec[2];
 	float orgin[2];
 	
 	Visualizer()
@@ -202,7 +195,8 @@ public:
 public:
 	bool OnUserCreate() override
 	{
-		cpuGenerateUniform(vec, 2, -1, 1);
+		cpuGenerateUniform(vec, 2, -60, 60);
+		cpuGenerateUniform(mouseVec, 2, -60, 60);
 
 		orgin[0] = ScreenWidth() * 0.5f;
 		orgin[1] = ScreenHeight() * 0.5f;
@@ -214,20 +208,24 @@ public:
 	{
 		Clear(olc::BLACK);
 		
-		// normalize mouse vector
-		float mouseVec[2];
-		mouseVec[0] = GetMouseX() - orgin[0];
-		mouseVec[1] = GetMouseY() - orgin[1];
+		if (GetMouse(0).bHeld)
+		{
+			mouseVec[0] = GetMouseX() - orgin[0];
+			mouseVec[1] = GetMouseY() - orgin[1];
+		}
 
-		DrawLine(orgin[0], orgin[1], orgin[0] + vec[0] * 100, orgin[1] + vec[1] * 100, olc::RED);
+		DrawLine(orgin[0], orgin[1], orgin[0] + vec[0] * 10, orgin[1] + vec[1] * 10, olc::RED);
 		DrawLine(orgin[0], orgin[1], orgin[0] + mouseVec[0], orgin[1] + mouseVec[1], olc::GREEN);
 		
-		// calculate gradient
 		float mouseGrad[2];
 		float vecGrad[2];
 		cpuNormDot(2, vec, mouseVec, vecGrad, mouseGrad);
 		
 		cpuSaxpy(2, &GLOBAL::LEARNING_RATE, vecGrad, 1, vec, 1);
+		cpuSaxpy(2, &GLOBAL::LEARNING_RATE, mouseGrad, 1, mouseVec, 1);
+		
+		float vecMag = sqrt(vec[0] * vec[0] + vec[1] * vec[1]);
+		DrawString(10, 10, "vec magnitude: " + std::to_string(vecMag), olc::WHITE, 1);
 
 		return true;
 	}
