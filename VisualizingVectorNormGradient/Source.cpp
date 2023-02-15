@@ -8,8 +8,9 @@ using std::chrono::microseconds;
 
 /*
 IMPORTANT LESSONS
-1. Without Runge Kutta 4, the length of the vector increases very noticeably.
-2. With Runge Kutta 4, the length of the vector remains stable within 0.0001%.
+1. With Euler, the length of the vector increases very noticeably.
+2. With Runge Kutta 4, the length of the vector remains a lot more stable
+3. For a learning rate of 0.1, the length of the vector increases by about 0.0001 per frame with runge kutta 4
 */
 
 class Random
@@ -93,7 +94,7 @@ namespace GLOBAL
 	constexpr float ZEROF = 0.0f;
 	constexpr float ONEF = 1.0f;
 	constexpr float TWOF = 2.0f;
-	constexpr float LEARNING_RATE = 0.01f;
+	constexpr float LEARNING_RATE = 0.1f;
 	constexpr float HALF_LEARNING_RATE = LEARNING_RATE * 0.5f;
 	constexpr float SIXTH_LEARNING_RATE = LEARNING_RATE * 0.16666666666666666666666666666667f;
 }
@@ -178,15 +179,15 @@ float cpuNormDot(uint32_t size, float* vec1, float* vec2, float* vec1Gradient, f
 		dot, 1, 0,
 		1);
 	
-	float denominator = invSqrt(*sum1 * *sum2);
+	float invMagsProduct = invSqrt(*sum1 * *sum2);
 	
 	for (uint32_t j = size; j--;)
-		vec1Gradient[j] = (vec2[j] * (*sum1 - vec1[j] * vec1[j]) + vec1[j] * (vec1[j] * vec2[j] - *dot)) * denominator;
+		vec1Gradient[j] = (vec2[j] * (*sum1 - vec1[j] * vec1[j]) + vec1[j] * (vec1[j] * vec2[j] - *dot)) * invMagsProduct;
 	
 	for (uint32_t j = size; j--;)
-		vec2Gradient[j] = (vec1[j] * (*sum2 - vec2[j] * vec2[j]) + vec2[j] * (vec2[j] * vec1[j] - *dot)) * denominator;
+		vec2Gradient[j] = (vec1[j] * (*sum2 - vec2[j] * vec2[j]) + vec2[j] * (vec2[j] * vec1[j] - *dot)) * invMagsProduct;
 
-	return *dot * denominator;
+	return *dot * invMagsProduct;
 }
 
 class Visualizer : public olc::PixelGameEngine
@@ -204,8 +205,11 @@ public:
 public:
 	bool OnUserCreate() override
 	{
-		cpuGenerateUniform(vec, 2, -60, 60);
-		cpuGenerateUniform(mouseVec, 2, -60, 60);
+		vec[0] = 100;
+		vec[1] = 0;
+
+		mouseVec[0] = -100;
+		mouseVec[1] = 0;
 
 		orgin[0] = ScreenWidth() * 0.5f;
 		orgin[1] = ScreenHeight() * 0.5f;
