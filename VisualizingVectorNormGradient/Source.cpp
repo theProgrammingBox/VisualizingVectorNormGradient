@@ -11,6 +11,7 @@ IMPORTANT LESSONS
 1. With Euler, the length of the vector increases very noticeably.
 2. With Runge Kutta 4, the length of the vector remains a lot more stable
 3. For a learning rate of 0.1, the length of the vector increases by about 0.0001 per frame with runge kutta 4
+4. If the initial vector length is very small, with the same learning rate, the length of the vector remains incredibly stable
 */
 
 class Random
@@ -205,7 +206,7 @@ public:
 public:
 	bool OnUserCreate() override
 	{
-		vec[0] = 100;
+		vec[0] = 0.001;
 		vec[1] = 0;
 
 		mouseVec[0] = -100;
@@ -219,15 +220,15 @@ public:
 
 	bool OnUserUpdate(float fElapsedTime) override
 	{
-		Clear(olc::BLACK);
-		
 		if (GetMouse(0).bHeld)
 		{
 			mouseVec[0] = GetMouseX() - orgin[0];
 			mouseVec[1] = GetMouseY() - orgin[1];
 		}
+		
+		Clear(olc::BLACK);
 
-		DrawLine(orgin[0], orgin[1], orgin[0] + vec[0], orgin[1] + vec[1], olc::RED);
+		DrawLine(orgin[0], orgin[1], orgin[0] + vec[0] * 100000, orgin[1] + vec[1] * 100000, olc::RED);
 		DrawLine(orgin[0], orgin[1], orgin[0] + mouseVec[0], orgin[1] + mouseVec[1], olc::GREEN);
 
 		//Runge-Kutta 4th order
