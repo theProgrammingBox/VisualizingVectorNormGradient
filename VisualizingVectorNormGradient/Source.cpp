@@ -12,6 +12,7 @@ IMPORTANT LESSONS
 2. With Runge Kutta 4, the length of the vector remains a lot more stable
 3. For a learning rate of 0.1, the length of the vector increases by about 0.0001 per frame with runge kutta 4
 4. If the initial vector length is very small, with the same learning rate, the length of the vector remains incredibly stable
+5. Error is larger when the initial vector length is large
 */
 
 class Random
@@ -215,7 +216,7 @@ public:
 public:
 	bool OnUserCreate() override
 	{
-		vec[0] = 0.001;
+		vec[0] = 1000;
 		vec[1] = 0;
 
 		mouseVec[0] = -100;
@@ -239,7 +240,7 @@ public:
 		
 		Clear(olc::BLACK);
 
-		DrawLine(orgin[0], orgin[1], orgin[0] + vec[0] * 100000, orgin[1] + vec[1] * 100000, olc::RED);
+		DrawLine(orgin[0], orgin[1], orgin[0] + vec[0] * 0.1, orgin[1] + vec[1] * 0.1, olc::RED);
 		DrawLine(orgin[0], orgin[1], orgin[0] + mouseVec[0], orgin[1] + mouseVec[1], olc::GREEN);
 
 		if (rungeKuttaStep == 0)
@@ -249,7 +250,7 @@ public:
 			cpuSaxpy(2, &GLOBAL::applied[rungeKuttaStep], vecDerivitive, 1, tempVec, 1);
 		cpuNormDot(2, tempVec, mouseVec, vecDerivitive, mouseVecDerivitive);
 		cpuSaxpy(2, &GLOBAL::summed[rungeKuttaStep], vecDerivitive, 1, vec, 1);
-		rungeKuttaStep -= (++rungeKuttaStep == 4) << 2;
+		rungeKuttaStep *= ++rungeKuttaStep != 4;
 		
 		float vecMag = sqrt(vec[0] * vec[0] + vec[1] * vec[1]);
 		DrawString(10, 10, "vec magnitude: " + std::to_string(vecMag), olc::WHITE, 1);
