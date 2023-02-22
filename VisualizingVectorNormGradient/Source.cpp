@@ -94,10 +94,14 @@ namespace GLOBAL
 	Random random(Random::MakeSeed(0));
 	constexpr float ZEROF = 0.0f;
 	constexpr float ONEF = 1.0f;
-	constexpr float TWOF = 2.0f;
+	
 	constexpr float LEARNING_RATE = 0.1f;
 	constexpr float HALF_LEARNING_RATE = LEARNING_RATE * 0.5f;
+	constexpr float THIRD_LEARNING_RATE = LEARNING_RATE * 0.33333333333333333333333333333333f;
 	constexpr float SIXTH_LEARNING_RATE = LEARNING_RATE * 0.16666666666666666666666666666667f;
+
+	constexpr float applied[4] = { 0.0f, HALF_LEARNING_RATE, HALF_LEARNING_RATE, LEARNING_RATE };
+	constexpr float summed[4] = { SIXTH_LEARNING_RATE, THIRD_LEARNING_RATE, THIRD_LEARNING_RATE, SIXTH_LEARNING_RATE };
 }
 
 void cpuGenerateUniform(float* matrix, uint32_t size, float min = 0, float max = 1)
@@ -196,7 +200,12 @@ class Visualizer : public olc::PixelGameEngine
 public:
 	float vec[2];
 	float mouseVec[2];
+	float tempVec[2];
+	float savedVec[2];
+	float vecDerivitive[2];
+	float mouseVecDerivitive[2];
 	float orgin[2];
+	uint32_t rungeKuttaStep;
 	
 	Visualizer()
 	{
@@ -214,6 +223,8 @@ public:
 
 		orgin[0] = ScreenWidth() * 0.5f;
 		orgin[1] = ScreenHeight() * 0.5f;
+
+		rungeKuttaStep = 0;
 		
 		return true;
 	}
@@ -231,45 +242,14 @@ public:
 		DrawLine(orgin[0], orgin[1], orgin[0] + vec[0] * 100000, orgin[1] + vec[1] * 100000, olc::RED);
 		DrawLine(orgin[0], orgin[1], orgin[0] + mouseVec[0], orgin[1] + mouseVec[1], olc::GREEN);
 
-		//Runge-Kutta 4th order
-		float mouseGrad1[2];
-		float vecGrad1[2];
-		float mouseGrad2[2];
-		float vecGrad2[2];
-		float mouseGrad3[2];
-		float vecGrad3[2];
-		float mouseGrad4[2];
-		float vecGrad4[2];
-		float mouseVecTemp[2];
-		float vecTemp[2];
-
-		cpuNormDot(2, vec, mouseVec, vecGrad1, mouseGrad1);
-		memcpy(vecTemp, vec, sizeof(float) * 2);
-		memcpy(mouseVecTemp, mouseVec, sizeof(float) * 2);
-		cpuSaxpy(2, &GLOBAL::HALF_LEARNING_RATE, mouseGrad1, 1, mouseVecTemp, 1);
-		cpuSaxpy(2, &GLOBAL::HALF_LEARNING_RATE, vecGrad1, 1, vecTemp, 1);
-		
-		cpuNormDot(2, vecTemp, mouseVecTemp, vecGrad2, mouseGrad2);
-		memcpy(vecTemp, vec, sizeof(float) * 2);
-		memcpy(mouseVecTemp, mouseVec, sizeof(float) * 2);
-		cpuSaxpy(2, &GLOBAL::HALF_LEARNING_RATE, mouseGrad2, 1, mouseVecTemp, 1);
-		cpuSaxpy(2, &GLOBAL::HALF_LEARNING_RATE, vecGrad2, 1, vecTemp, 1);
-
-		cpuNormDot(2, vecTemp, mouseVecTemp, vecGrad3, mouseGrad3);
-		memcpy(vecTemp, vec, sizeof(float) * 2);
-		memcpy(mouseVecTemp, mouseVec, sizeof(float) * 2);
-		cpuSaxpy(2, &GLOBAL::LEARNING_RATE, mouseGrad3, 1, mouseVecTemp, 1);
-		cpuSaxpy(2, &GLOBAL::LEARNING_RATE, vecGrad3, 1, vecTemp, 1);
-
-		cpuNormDot(2, vecTemp, mouseVecTemp, vecGrad4, mouseGrad4);
-		cpuSaxpy(2, &GLOBAL::TWOF, mouseGrad2, 1, mouseGrad1, 1);
-		cpuSaxpy(2, &GLOBAL::TWOF, vecGrad2, 1, vecGrad1, 1);
-		cpuSaxpy(2, &GLOBAL::TWOF, mouseGrad3, 1, mouseGrad1, 1);
-		cpuSaxpy(2, &GLOBAL::TWOF, vecGrad3, 1, vecGrad1, 1);
-		cpuSaxpy(2, &GLOBAL::ONEF, mouseGrad4, 1, mouseGrad1, 1);
-		cpuSaxpy(2, &GLOBAL::ONEF, vecGrad4, 1, vecGrad1, 1);
-		cpuSaxpy(2, &GLOBAL::SIXTH_LEARNING_RATE, mouseGrad1, 1, mouseVec, 1);
-		cpuSaxpy(2, &GLOBAL::SIXTH_LEARNING_RATE, vecGrad1, 1, vec, 1);
+		if (rungeKuttaStep == 0)
+			memcpy(savedVec, vec, sizeof(float) * 2);
+		memcpy(tempVec, savedVec, sizeof(float) * 2);
+		if (rungeKuttaStep != 0)
+			cpuSaxpy(2, &GLOBAL::applied[rungeKuttaStep], vecDerivitive, 1, tempVec, 1);
+		cpuNormDot(2, tempVec, mouseVec, vecDerivitive, mouseVecDerivitive);
+		cpuSaxpy(2, &GLOBAL::summed[rungeKuttaStep], vecDerivitive, 1, vec, 1);
+		rungeKuttaStep -= (++rungeKuttaStep == 4) << 2;
 		
 		float vecMag = sqrt(vec[0] * vec[0] + vec[1] * vec[1]);
 		DrawString(10, 10, "vec magnitude: " + std::to_string(vecMag), olc::WHITE, 1);
