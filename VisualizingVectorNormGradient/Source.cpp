@@ -195,8 +195,8 @@ public:
 public:
 	bool OnUserCreate() override
 	{
-		cpuGenerateUniform(vec, 2, -60, 60);
-		cpuGenerateUniform(mouseVec, 2, -60, 60);
+		cpuGenerateUniform(vec, 2, -100, 100);
+		cpuGenerateUniform(mouseVec, 2, -100, 100);
 
 		orgin[0] = ScreenWidth() * 0.5f;
 		orgin[1] = ScreenHeight() * 0.5f;
@@ -214,7 +214,7 @@ public:
 			mouseVec[1] = GetMouseY() - orgin[1];
 		}
 
-		DrawLine(orgin[0], orgin[1], orgin[0] + vec[0] * 10, orgin[1] + vec[1] * 10, olc::RED);
+		DrawLine(orgin[0], orgin[1], orgin[0] + vec[0], orgin[1] + vec[1], olc::RED);
 		DrawLine(orgin[0], orgin[1], orgin[0] + mouseVec[0], orgin[1] + mouseVec[1], olc::GREEN);
 		
 		float mouseGrad[2];
@@ -234,7 +234,7 @@ public:
 int main()
 {
 	Visualizer visualizer;
-	if (visualizer.Construct(960, 540, 1, 1))
+	if (visualizer.Construct(1600, 900, 1, 1))
 		visualizer.Start();
 	return 0;
 }
