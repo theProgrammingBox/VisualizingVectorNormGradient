@@ -248,7 +248,9 @@ public:
 		memcpy(tempVec, savedVec, sizeof(float) * 2);
 		if (rungeKuttaStep != 0)
 			cpuSaxpy(2, &GLOBAL::applied[rungeKuttaStep], vecDerivitive, 1, tempVec, 1);
+		
 		cpuNormDot(2, tempVec, mouseVec, vecDerivitive, mouseVecDerivitive);
+		
 		cpuSaxpy(2, &GLOBAL::summed[rungeKuttaStep], vecDerivitive, 1, vec, 1);
 		rungeKuttaStep *= ++rungeKuttaStep != 4;
 		
