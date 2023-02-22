@@ -6,6 +6,14 @@ using std::chrono::duration_cast;
 using std::chrono::nanoseconds;
 using std::chrono::microseconds;
 
+/*
+IMPORTANT LESSONS
+1. With Euler, the length of the vector increases very noticeably.
+2. With Runge Kutta 4, the length of the vector remains a lot more stable
+3. For a learning rate of 0.1, the length of the vector increases by about 0.0001 per frame with runge kutta 4
+4. If the initial vector length is very small, with the same learning rate, the length of the vector remains incredibly stable
+*/
+
 class Random
 {
 public:
@@ -84,9 +92,12 @@ private:
 namespace GLOBAL
 {
 	Random random(Random::MakeSeed(0));
-	constexpr float ONEF = 1.0f;
 	constexpr float ZEROF = 0.0f;
-	constexpr float LEARNING_RATE = 0.01f;
+	constexpr float ONEF = 1.0f;
+	constexpr float TWOF = 2.0f;
+	constexpr float LEARNING_RATE = 0.1f;
+	constexpr float HALF_LEARNING_RATE = LEARNING_RATE * 0.5f;
+	constexpr float SIXTH_LEARNING_RATE = LEARNING_RATE * 0.16666666666666666666666666666667f;
 }
 
 void cpuGenerateUniform(float* matrix, uint32_t size, float min = 0, float max = 1)
@@ -169,15 +180,15 @@ float cpuNormDot(uint32_t size, float* vec1, float* vec2, float* vec1Gradient, f
 		dot, 1, 0,
 		1);
 	
-	float denominator = invSqrt(*sum1 * *sum2);
+	float invMagsProduct = invSqrt(*sum1 * *sum2);
 	
 	for (uint32_t j = size; j--;)
-		vec1Gradient[j] = (vec2[j] * (*sum1 - vec1[j] * vec1[j]) + vec1[j] * (vec1[j] * vec2[j] - *dot)) * denominator;
+		vec1Gradient[j] = (vec2[j] * (*sum1 - vec1[j] * vec1[j]) + vec1[j] * (vec1[j] * vec2[j] - *dot)) * invMagsProduct;
 	
 	for (uint32_t j = size; j--;)
-		vec2Gradient[j] = (vec1[j] * (*sum2 - vec2[j] * vec2[j]) + vec2[j] * (vec2[j] * vec1[j] - *dot)) * denominator;
+		vec2Gradient[j] = (vec1[j] * (*sum2 - vec2[j] * vec2[j]) + vec2[j] * (vec2[j] * vec1[j] - *dot)) * invMagsProduct;
 
-	return *dot * denominator;
+	return *dot * invMagsProduct;
 }
 
 class Visualizer : public olc::PixelGameEngine
@@ -195,8 +206,11 @@ public:
 public:
 	bool OnUserCreate() override
 	{
-		cpuGenerateUniform(vec, 2, -100, 100);
-		cpuGenerateUniform(mouseVec, 2, -100, 100);
+		vec[0] = 0.001;
+		vec[1] = 0;
+
+		mouseVec[0] = -100;
+		mouseVec[1] = 0;
 
 		orgin[0] = ScreenWidth() * 0.5f;
 		orgin[1] = ScreenHeight() * 0.5f;
@@ -206,23 +220,56 @@ public:
 
 	bool OnUserUpdate(float fElapsedTime) override
 	{
-		Clear(olc::BLACK);
-		
 		if (GetMouse(0).bHeld)
 		{
 			mouseVec[0] = GetMouseX() - orgin[0];
 			mouseVec[1] = GetMouseY() - orgin[1];
 		}
+		
+		Clear(olc::BLACK);
 
-		DrawLine(orgin[0], orgin[1], orgin[0] + vec[0], orgin[1] + vec[1], olc::RED);
+		DrawLine(orgin[0], orgin[1], orgin[0] + vec[0] * 100000, orgin[1] + vec[1] * 100000, olc::RED);
 		DrawLine(orgin[0], orgin[1], orgin[0] + mouseVec[0], orgin[1] + mouseVec[1], olc::GREEN);
+
+		//Runge-Kutta 4th order
+		float mouseGrad1[2];
+		float vecGrad1[2];
+		float mouseGrad2[2];
+		float vecGrad2[2];
+		float mouseGrad3[2];
+		float vecGrad3[2];
+		float mouseGrad4[2];
+		float vecGrad4[2];
+		float mouseVecTemp[2];
+		float vecTemp[2];
+
+		cpuNormDot(2, vec, mouseVec, vecGrad1, mouseGrad1);
+		memcpy(vecTemp, vec, sizeof(float) * 2);
+		memcpy(mouseVecTemp, mouseVec, sizeof(float) * 2);
+		cpuSaxpy(2, &GLOBAL::HALF_LEARNING_RATE, mouseGrad1, 1, mouseVecTemp, 1);
+		cpuSaxpy(2, &GLOBAL::HALF_LEARNING_RATE, vecGrad1, 1, vecTemp, 1);
 		
-		float mouseGrad[2];
-		float vecGrad[2];
-		cpuNormDot(2, vec, mouseVec, vecGrad, mouseGrad);
-		
-		cpuSaxpy(2, &GLOBAL::LEARNING_RATE, vecGrad, 1, vec, 1);
-		cpuSaxpy(2, &GLOBAL::LEARNING_RATE, mouseGrad, 1, mouseVec, 1);
+		cpuNormDot(2, vecTemp, mouseVecTemp, vecGrad2, mouseGrad2);
+		memcpy(vecTemp, vec, sizeof(float) * 2);
+		memcpy(mouseVecTemp, mouseVec, sizeof(float) * 2);
+		cpuSaxpy(2, &GLOBAL::HALF_LEARNING_RATE, mouseGrad2, 1, mouseVecTemp, 1);
+		cpuSaxpy(2, &GLOBAL::HALF_LEARNING_RATE, vecGrad2, 1, vecTemp, 1);
+
+		cpuNormDot(2, vecTemp, mouseVecTemp, vecGrad3, mouseGrad3);
+		memcpy(vecTemp, vec, sizeof(float) * 2);
+		memcpy(mouseVecTemp, mouseVec, sizeof(float) * 2);
+		cpuSaxpy(2, &GLOBAL::LEARNING_RATE, mouseGrad3, 1, mouseVecTemp, 1);
+		cpuSaxpy(2, &GLOBAL::LEARNING_RATE, vecGrad3, 1, vecTemp, 1);
+
+		cpuNormDot(2, vecTemp, mouseVecTemp, vecGrad4, mouseGrad4);
+		cpuSaxpy(2, &GLOBAL::TWOF, mouseGrad2, 1, mouseGrad1, 1);
+		cpuSaxpy(2, &GLOBAL::TWOF, vecGrad2, 1, vecGrad1, 1);
+		cpuSaxpy(2, &GLOBAL::TWOF, mouseGrad3, 1, mouseGrad1, 1);
+		cpuSaxpy(2, &GLOBAL::TWOF, vecGrad3, 1, vecGrad1, 1);
+		cpuSaxpy(2, &GLOBAL::ONEF, mouseGrad4, 1, mouseGrad1, 1);
+		cpuSaxpy(2, &GLOBAL::ONEF, vecGrad4, 1, vecGrad1, 1);
+		cpuSaxpy(2, &GLOBAL::SIXTH_LEARNING_RATE, mouseGrad1, 1, mouseVec, 1);
+		cpuSaxpy(2, &GLOBAL::SIXTH_LEARNING_RATE, vecGrad1, 1, vec, 1);
 		
 		float vecMag = sqrt(vec[0] * vec[0] + vec[1] * vec[1]);
 		DrawString(10, 10, "vec magnitude: " + std::to_string(vecMag), olc::WHITE, 1);
